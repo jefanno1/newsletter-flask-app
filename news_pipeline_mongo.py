@@ -108,6 +108,7 @@ def ask_llm_select_top5(headlines: List[dict]) -> List[int]:
             {"role": "user", "content": prompt}
         ]
     )
+    print("LLM prompt:\n", prompt)
     raw = resp.choices[0].message.content.strip()
     if raw.startswith("```"):
         raw = raw.strip("`")
@@ -183,8 +184,9 @@ def make_selenium_driver(headless: bool = True):
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--remote-debugging-port=9222")
-
+    print("🌐 Starting Selenium Chrome driver...")
     driver = webdriver.Chrome(service=ChromeService(), options=chrome_options)
+    print("🌐 Chrome driver started")
     return driver
 
 
@@ -202,7 +204,8 @@ def scrape_article_text(driver, url: str, wait_seconds: int = SCRAPE_WAIT) -> st
             paras = [p.get_text().strip() for p in body.find_all("p") if p.get_text().strip()]
             return "\n".join(paras)
         return ""
-    except:
+    except Exception as e:
+        print("❌ Error loading URL:", url, e)
         return ""
 
 # =====================
@@ -221,6 +224,7 @@ def run_full_pipeline():
 
     print("🤖 Selecting top 5 headlines via LLM...")
     top_idx = ask_llm_select_top5(headlines[:HEADLINE_LIMIT])
+    print("🤖 LLM returned top indices:", top_idx)
     selected = [headlines[i-1] for i in top_idx if 1 <= i <= len(headlines)]
     print("Selected:", [h["Title"] for h in selected])
 
@@ -248,7 +252,9 @@ def run_full_pipeline():
                 links = []
 
             for link in links:
+                print(f"   Scraping article: {link}")
                 text = scrape_article_text(driver, link)
+                print(f"   Done scraping, length={len(text)}")
                 if text.strip():
                     supporting_articles.append({"link": link, "text": text})
 
@@ -268,6 +274,7 @@ def run_full_pipeline():
             "ig_post": ig_post,
             "created_at": datetime.now()
         }
+        print(f"💾 Inserting document for headline: {h['Title']}")
         news_col.insert_one(doc)
         print(f"✅ Inserted into MongoDB: {h['Title']}")
 
