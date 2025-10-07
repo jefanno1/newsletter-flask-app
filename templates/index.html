@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Newsletter Dashboard</title>
+    <style>
+        body { font-family: Arial; margin: 20px; }
+        .news-item { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; }
+        .summary { margin-top: 5px; font-style: italic; }
+    </style>
+</head>
+<body>
+    <h1>Newsletter Dashboard</h1>
+    <p>
+        Pipeline status: 
+        {% if pipeline_status.running %}
+            <b>Running...</b>
+        {% else %}
+            Idle (last run: {{ pipeline_status.last_run or "never" }})
+        {% endif %}
+    </p>
+    <a href="{{ url_for('run_pipeline') }}">Run Pipeline</a>
+
+    <hr>
+    <h2>Latest News</h2>
+    {% for item in news %}
+        <div class="news-item">
+            <h3><a href="{{ item.link }}" target="_blank">{{ item.title }}</a></h3>
+            <p>Source: {{ item.source }} | Published: {{ item.published }}</p>
+            <div class="summary">
+                <b>Summary (ID):</b> {{ item.summaries.id }}<br>
+                <b>Summary (EN):</b> {{ item.summaries.en }}
+            </div>
+            {% if item.ig_post %}
+                <div class="ig_post">
+                    <b>IG Title:</b> {{ item.ig_post.title }}<br>
+                    <b>IG Text:</b> {{ item.ig_post.ig_post }}
+                </div>
+            {% endif %}
+        </div>
+    {% endfor %}
+</body>
+</html>
