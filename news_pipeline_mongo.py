@@ -194,10 +194,15 @@ def make_selenium_driver(headless: bool = True):
 def scrape_article_text(driver, url: str, wait_seconds: int = SCRAPE_WAIT) -> str:
     try:
         driver.get(url)
+        print("Error 1")
         time.sleep(wait_seconds)
+        print("Error 2")
         html = driver.page_source[:200000]  # ambil maksimal 200 KB
+        print("Error 3")
         soup = BeautifulSoup(html, "html.parser")
+        print("Error 4")
         article = soup.find("article") or soup.find(role="main")
+        print("Error 5")
         if article:
             paras = [p.get_text().strip() for p in article.find_all("p") if p.get_text().strip()]
             return "\n".join(paras)
