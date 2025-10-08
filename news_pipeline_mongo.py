@@ -28,12 +28,12 @@ MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
 MONGO_DB = "NewsletterDB"
 MONGO_COLLECTION = "news"
 
-TOPIC_TOKEN_BUSINESS = "CAAqJggKIiBDQkFTRWdvSUwyMHZNRGx1YlY4U0FtVnVHZ0pWVXlnQVAB"
+TOPIC_TOKEN_BUSINESS = "CAAqJggKIiBDQkFTRWdvSUwyMHZNRGx6TVdZU0FtVnVHZ0pWVXlnQVAB"
 
-HEADLINE_LIMIT = 5
+HEADLINE_LIMIT = 10
 LLM_SELECT_MODEL = "gpt-5-nano"
 LLM_SUMMARY_MODEL = "gpt-5-nano"
-SUPPORTING_PER_HEADLINE = 3
+SUPPORTING_PER_HEADLINE = 5
 SCRAPE_WAIT = 3
 BAD_LABELS = {"top news", "posts on x", "frequently asked questions"}
 
@@ -98,7 +98,7 @@ def get_openai_client():
 
 def ask_llm_select_top5(headlines: List[dict]) -> List[int]:
     client = get_openai_client()
-    prompt = "Here are 5 headlines. Choose 2 most interesting to a general reader. Answer ONLY a JSON object like {\"selected\": [1,2]} with indices (1-based).\n\n"
+    prompt = "Here are 10 headlines. Choose 5 most interesting to a general reader. Answer ONLY a JSON object like {\"selected\": [1,2,3,4,5]} with indices (1-based).\n\n"
     for i, h in enumerate(headlines, start=1):
         prompt += f"{i}. {h['Title']}\n"
 
@@ -117,9 +117,9 @@ def ask_llm_select_top5(headlines: List[dict]) -> List[int]:
             raw = raw[4:].strip()
     try:
         sel = json.loads(raw).get("selected", [])
-        return [int(x) for x in sel][:2]
+        return [int(x) for x in sel][:5]
     except:
-        return list(range(1, min(3, len(headlines)+1)))
+        return list(range(1, min(6, len(headlines)+1)))
 
 def ask_llm_summarize_two_langs(text: str) -> dict:
     client = get_openai_client()
@@ -194,15 +194,10 @@ def make_selenium_driver(headless: bool = True):
 def scrape_article_text(driver, url: str, wait_seconds: int = SCRAPE_WAIT) -> str:
     try:
         driver.get(url)
-        print("Error 1")
         time.sleep(wait_seconds)
-        print("Error 2")
         html = driver.page_source[:200000]  # ambil maksimal 200 KB
-        print("Error 3")
         soup = BeautifulSoup(html, "html.parser")
-        print("Error 4")
         article = soup.find("article") or soup.find(role="main")
-        print("Error 5")
         if article:
             paras = [p.get_text().strip() for p in article.find_all("p") if p.get_text().strip()]
             return "\n".join(paras)
@@ -235,10 +230,9 @@ def run_full_pipeline():
     selected = [headlines[i-1] for i in top_idx if 1 <= i <= len(headlines)]
     print("Selected:", [h["Title"] for h in selected])
 
-    
+    driver = make_selenium_driver(headless=True)
 
     for h in selected:
-        driver = make_selenium_driver(headless=True)
         title_safe = safe_filename(h["Title"], 60)
         print(f"\n📂 Processing headline: {h['Title']}")
         token = h.get("StoryToken")
@@ -287,13 +281,10 @@ def run_full_pipeline():
         print(f"💾 Inserting document for headline: {h['Title']}")
         news_col.insert_one(doc)
         print(f"✅ Inserted into MongoDB: {h['Title']}")
-        del combined_text
-        del summaries
-        del ig_post
-        del supporting_articles
-        driver.quit()
-        print("\n🏁 Pipeline finished. All data saved in MongoDB collection:", MONGO_COLLECTION)
-        gc.collect()
+
+    driver.quit()
+    print("\n🏁 Pipeline finished. All data saved in MongoDB collection:", MONGO_COLLECTION)
+    gc.collect()
 
 if __name__ == "__main__":
     run_full_pipeline()
