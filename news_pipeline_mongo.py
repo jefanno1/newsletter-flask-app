@@ -3,6 +3,7 @@ import os
 import json
 import time
 import re
+import gc
 from datetime import datetime
 from typing import List, Optional
 from dotenv import load_dotenv
@@ -27,7 +28,7 @@ MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
 MONGO_DB = "NewsletterDB"
 MONGO_COLLECTION = "news"
 
-TOPIC_TOKEN_BUSINESS = "CAAqJggKIiBDQkFTRWdvSUwyMHZNRGRqTVhZU0FtVnVHZ0pWVXlnQVAB"
+TOPIC_TOKEN_BUSINESS = "CAAqJggKIiBDQkFTRWdvSUwyMHZNRGx1YlY4U0FtVnVHZ0pWVXlnQVAB"
 
 HEADLINE_LIMIT = 10
 LLM_SELECT_MODEL = "gpt-5-nano"
@@ -194,7 +195,8 @@ def scrape_article_text(driver, url: str, wait_seconds: int = SCRAPE_WAIT) -> st
     try:
         driver.get(url)
         time.sleep(wait_seconds)
-        soup = BeautifulSoup(driver.page_source, "html.parser")
+        html = driver.page_source[:200000]  # ambil maksimal 200 KB
+        soup = BeautifulSoup(html, "html.parser")
         article = soup.find("article") or soup.find(role="main")
         if article:
             paras = [p.get_text().strip() for p in article.find_all("p") if p.get_text().strip()]
@@ -228,9 +230,10 @@ def run_full_pipeline():
     selected = [headlines[i-1] for i in top_idx if 1 <= i <= len(headlines)]
     print("Selected:", [h["Title"] for h in selected])
 
-    driver = make_selenium_driver(headless=True)
+    
 
     for h in selected:
+        driver = make_selenium_driver(headless=True)
         title_safe = safe_filename(h["Title"], 60)
         print(f"\n📂 Processing headline: {h['Title']}")
         token = h.get("StoryToken")
@@ -259,6 +262,8 @@ def run_full_pipeline():
                     supporting_articles.append({"link": link, "text": text})
 
         combined_text = "\n".join([a["text"] for a in supporting_articles])
+        if len(combined_text) > 5000:
+            combined_text = combined_text[:5000]
         summaries = ask_llm_summarize_two_langs(combined_text) if combined_text else {"id":"","en":""}
         ig_post = ask_llm_igpost_from_text(summaries.get("en","")) if summaries.get("en") else None
 
@@ -277,9 +282,13 @@ def run_full_pipeline():
         print(f"💾 Inserting document for headline: {h['Title']}")
         news_col.insert_one(doc)
         print(f"✅ Inserted into MongoDB: {h['Title']}")
-
-    driver.quit()
-    print("\n🏁 Pipeline finished. All data saved in MongoDB collection:", MONGO_COLLECTION)
+        del combined_text
+        del summaries
+        del ig_post
+        del supporting_articles
+        driver.quit()
+        print("\n🏁 Pipeline finished. All data saved in MongoDB collection:", MONGO_COLLECTION)
+        gc.collect()
 
 if __name__ == "__main__":
     run_full_pipeline()
