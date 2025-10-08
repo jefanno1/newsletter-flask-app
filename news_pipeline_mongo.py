@@ -30,10 +30,10 @@ MONGO_COLLECTION = "news"
 
 TOPIC_TOKEN_BUSINESS = "CAAqJggKIiBDQkFTRWdvSUwyMHZNRGx1YlY4U0FtVnVHZ0pWVXlnQVAB"
 
-HEADLINE_LIMIT = 10
+HEADLINE_LIMIT = 5
 LLM_SELECT_MODEL = "gpt-5-nano"
 LLM_SUMMARY_MODEL = "gpt-5-nano"
-SUPPORTING_PER_HEADLINE = 5
+SUPPORTING_PER_HEADLINE = 3
 SCRAPE_WAIT = 3
 BAD_LABELS = {"top news", "posts on x", "frequently asked questions"}
 
@@ -98,7 +98,7 @@ def get_openai_client():
 
 def ask_llm_select_top5(headlines: List[dict]) -> List[int]:
     client = get_openai_client()
-    prompt = "Here are 10 headlines. Choose 5 most interesting to a general reader. Answer ONLY a JSON object like {\"selected\": [1,2,3,4,5]} with indices (1-based).\n\n"
+    prompt = "Here are 5 headlines. Choose 2 most interesting to a general reader. Answer ONLY a JSON object like {\"selected\": [1,2]} with indices (1-based).\n\n"
     for i, h in enumerate(headlines, start=1):
         prompt += f"{i}. {h['Title']}\n"
 
@@ -117,9 +117,9 @@ def ask_llm_select_top5(headlines: List[dict]) -> List[int]:
             raw = raw[4:].strip()
     try:
         sel = json.loads(raw).get("selected", [])
-        return [int(x) for x in sel][:5]
+        return [int(x) for x in sel][:2]
     except:
-        return list(range(1, min(6, len(headlines)+1)))
+        return list(range(1, min(3, len(headlines)+1)))
 
 def ask_llm_summarize_two_langs(text: str) -> dict:
     client = get_openai_client()
